@@ -4420,6 +4420,55 @@ local function process_request()
                             response.ok = false
                         end
                     
+                    elseif fname == "Track_GetPeakInfo" then
+                        -- Get track peak level
+                        if #args >= 2 then
+                            local track = nil
+                            if args[1] == -1 then
+                                track = reaper.GetMasterTrack(0)
+                            else
+                                track = reaper.GetTrack(0, args[1])
+                            end
+                            if track then
+                                local peak = reaper.Track_GetPeakInfo(track, args[2])
+                                local peak_db = -150
+                                if peak > 0 then
+                                    peak_db = 20 * math.log(peak, 10)
+                                end
+                                response.ok = true
+                                response.ret = peak_db
+                            else
+                                response.error = "Track not found"
+                                response.ok = false
+                            end
+                        else
+                            response.error = "Track_GetPeakInfo requires 2 arguments (track_index, channel)"
+                            response.ok = false
+                        end
+                    
+                    elseif fname == "Track_GetPeakHoldDB" then
+                        -- Get track peak hold level (max peak since last meter reset)
+                        if #args >= 2 then
+                            local track = nil
+                            if args[1] == -1 then
+                                track = reaper.GetMasterTrack(0)
+                            else
+                                track = reaper.GetTrack(0, args[1])
+                            end
+                            if track then
+                                local peak_hold = reaper.Track_GetPeakHoldDB(track, args[2], false)
+                                local peak_db = peak_hold * 100
+                                response.ok = true
+                                response.ret = peak_db
+                            else
+                                response.error = "Track not found"
+                                response.ok = false
+                            end
+                        else
+                            response.error = "Track_GetPeakHoldDB requires 2 arguments (track_index, channel)"
+                            response.ok = false
+                        end
+                    
                     else
                         -- Try generic function call
                         if reaper[fname] then

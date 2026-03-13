@@ -13,7 +13,6 @@ Version: 1.1.0
 """
 
 __version__ = "1.1.0"
-__name__ = "twelvetake-reaper-mcp"
 
 import os
 import asyncio
@@ -930,7 +929,7 @@ async def create_midi_item(track_index: int, position: float, length: float) -> 
     Returns:
         Object with item info.
     """
-    return await reaper_call("CreateNewMIDIItemInProj", track_index, position, position + length, False)
+    return await reaper_call("CreateMIDIItem", track_index, position, position + length)
 
 
 @mcp.tool()
@@ -954,26 +953,51 @@ async def add_midi_note(
     item_index: int,
     pitch: int,
     velocity: int,
-    start_ppq: float,
-    end_ppq: float,
+    start_beat: float,
+    length_beats: float,
     channel: int = 0
 ) -> dict:
     """
-    Add a MIDI note to an item.
+    Add a MIDI note to an item using musical timing (beats).
 
     Args:
         track_index: Track index (0-based).
         item_index: Item index (0-based) on the track.
         pitch: MIDI note number (0-127, 60 = middle C).
         velocity: Note velocity (1-127).
-        start_ppq: Start position in PPQ (pulses per quarter note).
-        end_ppq: End position in PPQ.
+        start_beat: Start position in beats (0 = first beat, 1 = second beat, etc.).
+        length_beats: Note length in beats (0.25 = sixteenth note, 0.5 = eighth note, 1.0 = quarter note).
         channel: MIDI channel (0-15, default 0).
 
     Returns:
         Object with note index.
+    
+    Example:
+        Four-on-the-floor kick pattern:
+        add_midi_note(0, 0, 36, 110, start_beat=0, length_beats=0.25)  # Beat 1
+        add_midi_note(0, 0, 36, 110, start_beat=1, length_beats=0.25)  # Beat 2
+        add_midi_note(0, 0, 36, 110, start_beat=2, length_beats=0.25)  # Beat 3
+        add_midi_note(0, 0, 36, 110, start_beat=3, length_beats=0.25)  # Beat 4
     """
-    return await reaper_call("MIDI_InsertNote", track_index, item_index, False, False, start_ppq, end_ppq, channel, pitch, velocity, False)
+    # Get tempo to convert beats to seconds
+    tempo_result = await reaper_call("Master_GetTempo")
+    tempo = tempo_result.get("ret", 120.0)
+    
+    # Convert beats to seconds: time = (beats / tempo) * 60
+    start_time = (start_beat / tempo) * 60.0
+    length = (length_beats / tempo) * 60.0
+    
+    return await reaper_call(
+        "InsertMIDINote",
+        track_index,
+        item_index,
+        pitch,
+        start_time,
+        length,
+        velocity,
+        channel
+    )
+
 
 
 @mcp.tool()
@@ -988,28 +1012,45 @@ async def add_midi_notes_batch(
     Args:
         track_index: Track index (0-based).
         item_index: Item index (0-based).
-        notes: List of note dicts with keys: pitch, velocity, start_ppq, end_ppq, channel (optional).
+        notes: List of note dicts with keys: pitch, velocity, start_beat, length_beats, channel (optional).
 
     Returns:
         Object with count of notes added.
+    
+    Example:
+        notes = [
+            {"pitch": 36, "velocity": 110, "start_beat": 0, "length_beats": 0.25},
+            {"pitch": 42, "velocity": 90, "start_beat": 0, "length_beats": 0.25},
+            {"pitch": 36, "velocity": 110, "start_beat": 1, "length_beats": 0.25}
+        ]
     """
+    # Get tempo for beat to time conversion
+    tempo_result = await reaper_call("Master_GetTempo")
+    tempo = tempo_result.get("ret", 120.0)
+
     results = []
     for note in notes:
+        start_beat = note.get("start_beat", 0)
+        length_beats = note.get("length_beats", 1.0)
+
+        # Convert beats to seconds: time = (beats / tempo) * 60
+        start_time = (start_beat / tempo) * 60.0
+        duration = (length_beats / tempo) * 60.0
+
         result = await reaper_call(
-            "MIDI_InsertNote",
+            "InsertMIDINote",
             track_index,
             item_index,
-            False,
-            False,
-            note.get("start_ppq", 0),
-            note.get("end_ppq", 480),
-            note.get("channel", 0),
             note.get("pitch", 60),
+            start_time,
+            duration,
             note.get("velocity", 100),
-            False
+            note.get("channel", 0)
         )
         results.append(result)
+
     return {"ok": True, "notes_added": len(results), "results": results}
+
 
 
 @mcp.tool()
@@ -1938,6 +1979,25 @@ async def get_track_peak(track_index: int, channel: int = 0) -> dict:
         Object with peak value in dB.
     """
     return await reaper_call("Track_GetPeakInfo", track_index, channel)
+
+
+@mcp.tool()
+async def get_track_peak_hold(track_index: int, channel: int = 0) -> dict:
+    """
+    Get the peak hold level of a track (highest peak since meters were last reset).
+
+    This returns the max peak from a previous playback without needing to be
+    actively playing. Play the project, stop it, then call this to see the
+    highest peak each track hit.
+
+    Args:
+        track_index: Track index (0-based) or -1 for master.
+        channel: Channel (0=left, 1=right).
+
+    Returns:
+        Object with peak hold value in dB.
+    """
+    return await reaper_call("Track_GetPeakHoldDB", track_index, channel)
 
 
 # --- ADVANCED FEATURES ---
