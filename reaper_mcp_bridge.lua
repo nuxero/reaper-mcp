@@ -1657,6 +1657,39 @@ local function process_request()
                             response.error = "GetMediaItemInfo_Value requires 2 arguments"
                         end
                     
+                    elseif fname == "SetMediaItemInfo_Value" then
+                        if #args >= 4 then
+                            local track_index = args[1]
+                            local item_index = args[2]
+                            local param_name = args[3]
+                            local value = args[4]
+                            
+                            -- Get track by index
+                            local track
+                            if track_index == -1 then
+                                track = reaper.GetMasterTrack(0)
+                            else
+                                track = reaper.GetTrack(0, track_index)
+                            end
+                            
+                            if not track then
+                                response.error = "Track not found at index " .. tostring(track_index)
+                                response.ok = false
+                            else
+                                -- Get item on track
+                                local item = reaper.GetTrackMediaItem(track, item_index)
+                                if not item then
+                                    response.error = "Media item not found at index " .. tostring(item_index) .. " on track " .. tostring(track_index)
+                                    response.ok = false
+                                else
+                                    reaper.SetMediaItemInfo_Value(item, param_name, value)
+                                    response.ok = true
+                                end
+                            end
+                        else
+                            response.error = "SetMediaItemInfo_Value requires 4 arguments (track_index, item_index, param_name, value)"
+                        end
+                    
                     elseif fname == "SetMediaItemLength" then
                         if #args >= 3 then
                             local item = args[1]
