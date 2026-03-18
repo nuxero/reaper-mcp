@@ -1657,6 +1657,58 @@ local function process_request()
                             response.error = "GetMediaItemInfo_Value requires 2 arguments"
                         end
                     
+                    elseif fname == "GetItemInfo" then
+                        if #args >= 2 then
+                            local track_index = args[1]
+                            local item_index = args[2]
+                            local track
+                            if track_index == -1 then
+                                track = reaper.GetMasterTrack(0)
+                            else
+                                track = reaper.GetTrack(0, track_index)
+                            end
+                            if not track then
+                                response.error = "Track not found at index " .. tostring(track_index)
+                                response.ok = false
+                            else
+                                local item = reaper.GetTrackMediaItem(track, item_index)
+                                if not item then
+                                    response.error = "Media item not found at index " .. tostring(item_index) .. " on track " .. tostring(track_index)
+                                    response.ok = false
+                                else
+                                    local position = reaper.GetMediaItemInfo_Value(item, "D_POSITION")
+                                    local length = reaper.GetMediaItemInfo_Value(item, "D_LENGTH")
+                                    local volume = reaper.GetMediaItemInfo_Value(item, "D_VOL")
+                                    local mute = reaper.GetMediaItemInfo_Value(item, "B_MUTE") == 1
+                                    local loop_src = reaper.GetMediaItemInfo_Value(item, "B_LOOPSRC") == 1
+                                    local fade_in = reaper.GetMediaItemInfo_Value(item, "D_FADEINLEN")
+                                    local fade_out = reaper.GetMediaItemInfo_Value(item, "D_FADEOUTLEN")
+                                    local take = reaper.GetActiveTake(item)
+                                    local is_midi = false
+                                    local take_name = ""
+                                    if take then
+                                        is_midi = reaper.TakeIsMIDI(take)
+                                        local retval, name = reaper.GetTakeName(take)
+                                        if retval then take_name = name end
+                                    end
+                                    response.ok = true
+                                    response.info = {
+                                        position = position,
+                                        length = length,
+                                        volume = volume,
+                                        mute = mute,
+                                        loop_source = loop_src,
+                                        fade_in = fade_in,
+                                        fade_out = fade_out,
+                                        is_midi = is_midi,
+                                        take_name = take_name
+                                    }
+                                end
+                            end
+                        else
+                            response.error = "GetItemInfo requires 2 arguments (track_index, item_index)"
+                        end
+
                     elseif fname == "SetMediaItemInfo_Value" then
                         if #args >= 4 then
                             local track_index = args[1]
