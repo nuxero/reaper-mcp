@@ -2143,22 +2143,279 @@ async def save_fx_preset(track_index: int, fx_index: int, preset_name: str) -> d
     return await reaper_call("TrackFX_SavePreset", track_index, fx_index, preset_name)
 
 
+# --- ReaEQ OPERATIONS ---
+
+@mcp.tool()
+async def get_eq_bands(track_index: int, fx_index: int) -> dict:
+    """
+    Get all ReaEQ band settings in one call.
+
+    Reads every parameter from the ReaEQ instance and returns structured band
+    data with human-readable values. This is the recommended way to inspect
+    ReaEQ state — avoids needing to parse raw chunks or guess parameter indices.
+
+    Args:
+        track_index: Track index (0-based) or -1 for master.
+        fx_index: FX index (0-based) of ReaEQ in the FX chain.
+
+    Returns:
+        Object with 'bands' list, each containing:
+        - band_index: parameter-level band index
+        - bandtype: type code (-1=master gain, 0=hipass, 1=loshelf, 2=band,
+                    3=notch, 4=hishelf, 5=lopass, 6=bandpass, 7=parallel bandpass)
+        - bandtype_name: human-readable type name
+        - paramtype: 0=freq, 1=gain, 2=Q
+        - paramtype_name: human-readable param name
+        - normval: normalized value (0-1)
+    """
+    # Get parameter count
+    count_result = await reaper_call("TrackFX_GetNumParams", track_index, fx_index)
+    num_params = count_result.get("ret", 0)
+
+    bandtype_names = {
+        -1: "master gain", 0: "hipass", 1: "loshelf", 2: "band",
+        3: "notch", 4: "hishelf", 5: "lopass", 6: "bandpass",
+        7: "parallel bandpass"
+    }
+    paramtype_names = {0: "freq", 1: "gain", 2: "Q"}
+
+    bands = []
+    for i in range(num_params):
+        result = await reaper_call("TrackFX_GetEQParam", track_index, fx_index, i)
+        if result.get("ok"):
+            bt = result.get("bandtype", -99)
+            pt = result.get("paramtype", -1)
+            bands.append({
+                "band_index": i,
+                "bandtype": bt,
+                "bandtype_name": bandtype_names.get(bt, "unknown"),
+                "bandidx": result.get("bandidx", 0),
+                "paramtype": pt,
+                "paramtype_name": paramtype_names.get(pt, "unknown"),
+                "normval": result.get("normval", 0),
+            })
+
+    # Also get formatted values for readability
+    for band in bands:
+        fmt = await reaper_call("TrackFX_GetFormattedParamValue", track_index, fx_index, band["band_index"])
+        if fmt.get("ok"):
+            band["formatted"] = fmt.get("ret", "")
+
+    return {"ok": True, "bands": bands, "param_count": num_params}
+
+
+@mcp.tool()
+async def set_eq_band(
+    track_index: int,
+    fx_index: int,
+    bandtype: int,
+    bandidx: int,
+    paramtype: int,
+    value: float,
+    is_normalized: bool = False
+) -> dict:
+    """
+    Set a ReaEQ band parameter using REAPER's dedicated EQ API.
+
+    This uses real values (Hz, dB, Q) by default, not normalized 0-1 values.
+    Much easier than figuring out raw parameter indices.
+
+    Args:
+        track_index: Track index (0-based) or -1 for master.
+        fx_index: FX index (0-based) of ReaEQ in the FX chain.
+        bandtype: Band type (-1=master gain, 0=hipass, 1=loshelf, 2=band,
+                  3=notch, 4=hishelf, 5=lopass, 6=bandpass, 7=parallel bandpass).
+        bandidx: Band index within that type (0=first, 1=second, etc.).
+                 Ignored for master gain.
+        paramtype: Parameter to set (0=frequency in Hz, 1=gain in dB, 2=Q/bandwidth).
+                   Ignored for master gain.
+        value: The value to set (Hz for freq, dB for gain, Q factor for Q).
+        is_normalized: If True, value is treated as normalized 0-1 instead of real units.
+
+    Returns:
+        Object with success status.
+    """
+    return await reaper_call(
+        "TrackFX_SetEQParam", track_index, fx_index,
+        bandtype, bandidx, paramtype, value, is_normalized
+    )
+
+
+@mcp.tool()
+async def get_eq_band_enabled(
+    track_index: int,
+    fx_index: int,
+    bandtype: int,
+    bandidx: int = 0
+) -> dict:
+    """
+    Check if a ReaEQ band is enabled.
+
+    Args:
+        track_index: Track index (0-based) or -1 for master.
+        fx_index: FX index (0-based) of ReaEQ in the FX chain.
+        bandtype: Band type (-1=master gain, 0=hipass, 1=loshelf, 2=band,
+                  3=notch, 4=hishelf, 5=lopass, 6=bandpass, 7=parallel bandpass).
+        bandidx: Band index within that type (0=first, 1=second, etc.).
+
+    Returns:
+        Object with 'ret' boolean (true=enabled, false=disabled).
+    """
+    return await reaper_call(
+        "TrackFX_GetEQBandEnabled", track_index, fx_index, bandtype, bandidx
+    )
+
+
+@mcp.tool()
+async def set_eq_band_enabled(
+    track_index: int,
+    fx_index: int,
+    bandtype: int,
+    bandidx: int = 0,
+    enabled: bool = True
+) -> dict:
+    """
+    Enable or disable a ReaEQ band.
+
+    Args:
+        track_index: Track index (0-based) or -1 for master.
+        fx_index: FX index (0-based) of ReaEQ in the FX chain.
+        bandtype: Band type (-1=master gain, 0=hipass, 1=loshelf, 2=band,
+                  3=notch, 4=hishelf, 5=lopass, 6=bandpass, 7=parallel bandpass).
+        bandidx: Band index within that type (0=first, 1=second, etc.).
+        enabled: True to enable, False to disable.
+
+    Returns:
+        Object with success status.
+    """
+    return await reaper_call(
+        "TrackFX_SetEQBandEnabled", track_index, fx_index, bandtype, bandidx, enabled
+    )
+
+
+@mcp.tool()
+async def find_eq(track_index: int, instantiate: bool = False) -> dict:
+    """
+    Find ReaEQ on a track, optionally adding it if not present.
+
+    Args:
+        track_index: Track index (0-based) or -1 for master.
+        instantiate: If True and ReaEQ is not on the track, add it.
+
+    Returns:
+        Object with 'ret' containing the FX index of ReaEQ, or -1 if not found.
+    """
+    return await reaper_call("TrackFX_GetEQ", track_index, instantiate)
+
+
 @mcp.tool()
 async def get_track_fx_chunk(track_index: int, fx_index: int) -> dict:
     """
-    Get the raw state chunk from an FX plugin (includes preset/state data).
+    Get the state chunk from an FX plugin, parsed into structured data.
 
-    Useful for reading VSTi state data like Toontrack EZkeys chord progressions.
-    The chunk contains the full serialized state of the plugin.
+    Returns both the parsed metadata (plugin name, bypass state, preset, wet/dry,
+    parameter count) and the raw base64 state data. For ReaEQ, prefer the
+    dedicated get_eq_bands() tool instead.
 
     Args:
         track_index: Track index (0-based) or -1 for master.
         fx_index: FX index (0-based) in the FX chain.
 
     Returns:
-        Object with 'chunk' containing the FX state data string.
+        Object with:
+        - fx_type: Plugin format (VST, VST3, JS, CLAP, etc.)
+        - fx_name: Plugin name as shown in REAPER
+        - preset_name: Current preset name (if any)
+        - bypass: {bypassed, offline, value} from BYPASS line
+        - wet_dry: Wet/dry mix value if present
+        - float_pos: Floating window position if present
+        - parameters: List of float parameter values from the first data line
+        - base64_state: The raw base64-encoded plugin state (for advanced use)
+        - raw_chunk: The full unparsed chunk text
     """
-    return await reaper_call("GetFXChunk", track_index, fx_index)
+    result = await reaper_call("GetFXChunk", track_index, fx_index)
+    if not result.get("ok") or not result.get("chunk"):
+        return result
+
+    chunk = result["chunk"]
+    parsed = {"ok": True, "fx_index": fx_index, "raw_chunk": chunk}
+
+    lines = chunk.strip().split("\n")
+    base64_lines = []
+    in_base64 = False
+
+    for line in lines:
+        stripped = line.strip()
+
+        # First line: <VST "name" plugin.dll ... or <JS etc
+        if stripped.startswith("<VST3 ") or stripped.startswith("<VST "):
+            parsed["fx_type"] = "VST3" if stripped.startswith("<VST3") else "VST"
+            # Extract quoted plugin name
+            parts = stripped.split('"')
+            if len(parts) >= 2:
+                parsed["fx_name"] = parts[1]
+        elif stripped.startswith("<JS "):
+            parsed["fx_type"] = "JS"
+            parts = stripped.split()
+            if len(parts) >= 2:
+                parsed["fx_name"] = parts[1]
+        elif stripped.startswith("<CLAP "):
+            parsed["fx_type"] = "CLAP"
+            parts = stripped.split('"')
+            if len(parts) >= 2:
+                parsed["fx_name"] = parts[1]
+
+        # BYPASS line: BYPASS 0 0 0
+        elif stripped.startswith("BYPASS "):
+            vals = stripped.split()
+            if len(vals) >= 4:
+                parsed["bypass"] = {
+                    "bypassed": vals[1] != "0",
+                    "offline": vals[2] != "0",
+                    "value": vals[1],
+                }
+
+        # PRESETNAME
+        elif stripped.startswith("PRESETNAME "):
+            parsed["preset_name"] = stripped[len("PRESETNAME "):].strip()
+
+        # FLOATPOS
+        elif stripped.startswith("FLOATPOS "):
+            parsed["float_pos"] = stripped[len("FLOATPOS "):].strip()
+
+        # WET/DRY
+        elif stripped.startswith("WET "):
+            try:
+                parsed["wet_dry"] = float(stripped.split()[1])
+            except (IndexError, ValueError):
+                pass
+
+        # WAK line (window state)
+        elif stripped.startswith("WAK "):
+            pass  # internal, not useful to expose
+
+        # Parameter values line (space-separated floats, typically first data line after header)
+        elif not in_base64 and " " in stripped:
+            parts = stripped.split()
+            try:
+                floats = [float(p) for p in parts]
+                if len(floats) >= 2 and "parameters" not in parsed:
+                    parsed["parameters"] = floats
+                    in_base64 = True  # lines after params are base64
+                    continue
+            except ValueError:
+                pass
+
+        # Base64 state data (long lines of alphanumeric + /+=)
+        elif in_base64 and stripped and not stripped.startswith("<") and not stripped.startswith(">"):
+            if len(stripped) > 10 and stripped.replace("+", "").replace("/", "").replace("=", "").isalnum():
+                base64_lines.append(stripped)
+
+    if base64_lines:
+        parsed["base64_state"] = "\n".join(base64_lines)
+        parsed["base64_size_bytes"] = sum(len(l) for l in base64_lines)
+
+    return parsed
 
 
 @mcp.tool()

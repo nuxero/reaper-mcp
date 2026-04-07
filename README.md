@@ -4,7 +4,7 @@
 
 A [TwelveTake Studios](https://twelvetake.com) project.
 
-[![Tools](https://img.shields.io/badge/tools-134-blue)](https://github.com/TwelveTake/reaper-mcp)
+[![Tools](https://img.shields.io/badge/tools-139-blue)](https://github.com/TwelveTake/reaper-mcp)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-yellow)](https://buymeacoffee.com/twelvetake)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-support-ff5e5b)](https://ko-fi.com/twelvetake)
 
@@ -34,9 +34,10 @@ Most MCP servers just wrap REAPER's API and call it a day. This one includes **p
 - **Stock REAPER Lua only** — the bridge script has no dependencies, nothing extra to install in REAPER
 - Copy the script, run it, connect your AI assistant
 
-### 134 Tools Covering Real Production Needs
+### 139 Tools Covering Real Production Needs
 
 - **Full FX control** — add/remove plugins, get/set any parameter by index, manage presets, bypass
+- **Dedicated ReaEQ API** — read/write EQ bands with real values (Hz, dB, Q) instead of parsing raw chunks
 - **Complete routing** — sends, receives, sidechain routing to specific channel pairs, master/parent send control
 - **Automation** — create envelopes, add/edit points, set automation modes
 - **MIDI** — create items, add notes individually or in batches, edit velocities
@@ -278,6 +279,19 @@ REAPER_COMM_MODE=http python reaper_mcp_server.py
 | `set_fx_preset(index, fx_index, name)` | Load preset |
 | `save_fx_preset(index, fx_index, name)` | Save current settings as preset |
 
+### ReaEQ Operations (5 tools)
+
+| Tool | Description |
+|------|-------------|
+| `find_eq(track, instantiate)` | Find ReaEQ on a track (optionally add it) |
+| `get_eq_bands(track, fx_index)` | Get all band settings with formatted values |
+| `set_eq_band(track, fx, bandtype, bandidx, paramtype, value)` | Set band freq/gain/Q with real values |
+| `get_eq_band_enabled(track, fx, bandtype, bandidx)` | Check if a band is enabled |
+| `set_eq_band_enabled(track, fx, bandtype, bandidx, enabled)` | Enable/disable a band |
+
+ReaEQ band types: `-1`=master gain, `0`=hipass, `1`=loshelf, `2`=band, `3`=notch, `4`=hishelf, `5`=lopass, `6`=bandpass, `7`=parallel bandpass.
+Parameter types: `0`=frequency (Hz), `1`=gain (dB), `2`=Q.
+
 ### Routing (11 tools)
 
 | Tool | Description |
@@ -423,7 +437,7 @@ REAPER_COMM_MODE=http python reaper_mcp_server.py
 |------|-------------|
 | `run_action(action_id)` | Run REAPER action by ID |
 | `run_action_by_name(name)` | Run action by name |
-| `get_track_fx_chunk(track, fx)` | Get raw FX state data |
+| `get_track_fx_chunk(track, fx)` | Get parsed FX state (name, preset, bypass, params, base64) |
 | `cut_selected_items()` | Cut items to clipboard |
 
 ## Track Indexing

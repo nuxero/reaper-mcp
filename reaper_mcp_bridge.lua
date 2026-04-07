@@ -4554,6 +4554,183 @@ local function process_request()
                             response.ok = false
                         end
                     
+                    elseif fname == "TrackFX_GetFormattedParamValue" then
+                        -- Get human-readable formatted parameter value
+                        if #args >= 3 then
+                            local track = nil
+                            if args[1] == -1 then
+                                track = reaper.GetMasterTrack(0)
+                            else
+                                track = reaper.GetTrack(0, args[1])
+                            end
+                            if track then
+                                local retval, buf = reaper.TrackFX_GetFormattedParamValue(track, args[2], args[3], "")
+                                response.ok = retval
+                                response.ret = buf
+                            else
+                                response.error = "Track not found"
+                                response.ok = false
+                            end
+                        else
+                            response.error = "TrackFX_GetFormattedParamValue requires 3 arguments (track_index, fx_index, param_index)"
+                            response.ok = false
+                        end
+
+                    elseif fname == "TrackFX_GetEQ" then
+                        -- Get ReaEQ FX index on a track
+                        if #args >= 2 then
+                            local track = nil
+                            if args[1] == -1 then
+                                track = reaper.GetMasterTrack(0)
+                            else
+                                track = reaper.GetTrack(0, args[1])
+                            end
+                            if track then
+                                local fx_index = reaper.TrackFX_GetEQ(track, args[2])
+                                response.ok = true
+                                response.ret = fx_index
+                            else
+                                response.error = "Track not found"
+                                response.ok = false
+                            end
+                        else
+                            response.error = "TrackFX_GetEQ requires 2 arguments (track_index, instantiate)"
+                            response.ok = false
+                        end
+
+                    elseif fname == "TrackFX_GetEQParam" then
+                        -- Get ReaEQ band parameter info
+                        if #args >= 3 then
+                            local track = nil
+                            if args[1] == -1 then
+                                track = reaper.GetMasterTrack(0)
+                            else
+                                track = reaper.GetTrack(0, args[1])
+                            end
+                            if track then
+                                local retval, bandtype, bandidx, paramtype, normval = reaper.TrackFX_GetEQParam(track, args[2], args[3])
+                                response.ok = retval
+                                response.bandtype = bandtype
+                                response.bandidx = bandidx
+                                response.paramtype = paramtype
+                                response.normval = normval
+                            else
+                                response.error = "Track not found"
+                                response.ok = false
+                            end
+                        else
+                            response.error = "TrackFX_GetEQParam requires 3 arguments (track_index, fx_index, param_index)"
+                            response.ok = false
+                        end
+
+                    elseif fname == "TrackFX_SetEQParam" then
+                        -- Set ReaEQ band parameter
+                        if #args >= 7 then
+                            local track = nil
+                            if args[1] == -1 then
+                                track = reaper.GetMasterTrack(0)
+                            else
+                                track = reaper.GetTrack(0, args[1])
+                            end
+                            if track then
+                                local retval = reaper.TrackFX_SetEQParam(track, args[2], args[3], args[4], args[5], args[6], args[7])
+                                response.ok = retval
+                            else
+                                response.error = "Track not found"
+                                response.ok = false
+                            end
+                        else
+                            response.error = "TrackFX_SetEQParam requires 7 arguments (track_index, fx_index, bandtype, bandidx, paramtype, value, is_norm)"
+                            response.ok = false
+                        end
+
+                    elseif fname == "TrackFX_GetEQBandEnabled" then
+                        -- Check if ReaEQ band is enabled
+                        if #args >= 4 then
+                            local track = nil
+                            if args[1] == -1 then
+                                track = reaper.GetMasterTrack(0)
+                            else
+                                track = reaper.GetTrack(0, args[1])
+                            end
+                            if track then
+                                local enabled = reaper.TrackFX_GetEQBandEnabled(track, args[2], args[3], args[4])
+                                response.ok = true
+                                response.ret = enabled
+                            else
+                                response.error = "Track not found"
+                                response.ok = false
+                            end
+                        else
+                            response.error = "TrackFX_GetEQBandEnabled requires 4 arguments (track_index, fx_index, bandtype, bandidx)"
+                            response.ok = false
+                        end
+
+                    elseif fname == "TrackFX_SetEQBandEnabled" then
+                        -- Enable/disable ReaEQ band
+                        if #args >= 5 then
+                            local track = nil
+                            if args[1] == -1 then
+                                track = reaper.GetMasterTrack(0)
+                            else
+                                track = reaper.GetTrack(0, args[1])
+                            end
+                            if track then
+                                local retval = reaper.TrackFX_SetEQBandEnabled(track, args[2], args[3], args[4], args[5])
+                                response.ok = true
+                                response.ret = retval
+                            else
+                                response.error = "Track not found"
+                                response.ok = false
+                            end
+                        else
+                            response.error = "TrackFX_SetEQBandEnabled requires 5 arguments (track_index, fx_index, bandtype, bandidx, enable)"
+                            response.ok = false
+                        end
+
+                    elseif fname == "TrackFX_GetNamedConfigParm" then
+                        -- Get named config parameter from FX
+                        if #args >= 3 then
+                            local track = nil
+                            if args[1] == -1 then
+                                track = reaper.GetMasterTrack(0)
+                            else
+                                track = reaper.GetTrack(0, args[1])
+                            end
+                            if track then
+                                local retval, value = reaper.TrackFX_GetNamedConfigParm(track, args[2], args[3])
+                                response.ok = retval
+                                response.ret = value
+                            else
+                                response.error = "Track not found"
+                                response.ok = false
+                            end
+                        else
+                            response.error = "TrackFX_GetNamedConfigParm requires 3 arguments (track_index, fx_index, parm_name)"
+                            response.ok = false
+                        end
+
+                    elseif fname == "TrackFX_SetNamedConfigParm" then
+                        -- Set named config parameter on FX
+                        if #args >= 4 then
+                            local track = nil
+                            if args[1] == -1 then
+                                track = reaper.GetMasterTrack(0)
+                            else
+                                track = reaper.GetTrack(0, args[1])
+                            end
+                            if track then
+                                local retval = reaper.TrackFX_SetNamedConfigParm(track, args[2], args[3], args[4])
+                                response.ok = retval
+                            else
+                                response.error = "Track not found"
+                                response.ok = false
+                            end
+                        else
+                            response.error = "TrackFX_SetNamedConfigParm requires 4 arguments (track_index, fx_index, parm_name, value)"
+                            response.ok = false
+                        end
+
                     else
                         -- Try generic function call
                         if reaper[fname] then
