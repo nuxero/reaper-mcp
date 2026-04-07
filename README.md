@@ -6,7 +6,7 @@
 > [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-TwelveTake-yellow)](https://buymeacoffee.com/twelvetake)
 > [![Ko-fi](https://img.shields.io/badge/Ko--fi-TwelveTake-ff5e5b)](https://ko-fi.com/twelvetake)
 
-[![Tools](https://img.shields.io/badge/tools-139-blue)](https://github.com/nuxero/reaper-mcp)
+[![Tools](https://img.shields.io/badge/tools-140-blue)](https://github.com/nuxero/reaper-mcp)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-support%20this%20fork-ff5e5b)](https://ko-fi.com/hectorzg)
 
@@ -19,12 +19,16 @@
 **New tools & features:**
 - `get_track_master_send` / `set_track_master_send` — control master/parent send per track
 - `clear_all_peak_indicators` — reset peak hold indicators across all tracks
-- `get_eq_bands` / `set_eq_band` / `get_eq_band_enabled` / `set_eq_band_enabled` — dedicated ReaEQ band control with real values (Hz, dB, Q)
-- `get_track_fx_chunk` — get parsed FX state (name, preset, bypass, params, base64)
-- `get_project_summary` — comprehensive project state in one call
+- `get_track_peak_hold` — read peak hold level (highest since last reset) for gain staging
+- `track_fx_get_all_params` — dump all FX parameters with names, values, ranges, and formatted display strings in one call (no more base64 chunk decoding)
+- `get_eq_bands` / `set_eq_band` / `get_eq_band_enabled` / `set_eq_band_enabled` / `find_eq` — dedicated ReaEQ band control with real values (Hz, dB, Q)
+- `get_track_fx_chunk` now parses the raw chunk into structured data (fx type, name, preset, bypass state, parameters, base64 state)
+
+**Lua bridge additions:**
+- `TrackFX_GetFormattedParamValue`, `TrackFX_GetEQ`, `TrackFX_GetEQParam`, `TrackFX_SetEQParam`, `TrackFX_GetEQBandEnabled`, `TrackFX_SetEQBandEnabled`, `TrackFX_GetNamedConfigParm`, `TrackFX_SetNamedConfigParm` handlers
 
 **Environment & setup:**
-- Nix flake + direnv support for reproducible dev environments
+- Nix flake + direnv support with MCP JSON configuration instructions
 
 A comprehensive Model Context Protocol (MCP) server that enables AI assistants to control REAPER DAW for mixing, mastering, MIDI composition, and full music production workflows.
 
@@ -52,7 +56,7 @@ Most MCP servers just wrap REAPER's API and call it a day. This one includes **p
 - **Stock REAPER Lua only** — the bridge script has no dependencies, nothing extra to install in REAPER
 - Copy the script, run it, connect your AI assistant
 
-### 139 Tools Covering Real Production Needs
+### 140 Tools Covering Real Production Needs
 
 - **Full FX control** — add/remove plugins, get/set any parameter by index, manage presets, bypass
 - **Dedicated ReaEQ API** — read/write EQ bands with real values (Hz, dB, Q) instead of parsing raw chunks
@@ -277,7 +281,7 @@ REAPER_COMM_MODE=http python reaper_mcp_server.py
 | `set_track_input(index, input)` | Set record input |
 | `set_track_monitor(index, mode)` | Set monitor mode |
 
-### FX Operations (15 tools)
+### FX Operations (16 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -292,6 +296,7 @@ REAPER_COMM_MODE=http python reaper_mcp_server.py
 | `track_fx_get_param_name(index, fx_index, param)` | Get parameter name |
 | `track_fx_get_param(index, fx_index, param)` | Get parameter value |
 | `track_fx_set_param(index, fx_index, param, value)` | Set parameter value |
+| `track_fx_get_all_params(index, fx_index)` | Get all params with names, values, and formatted strings |
 | `get_fx_presets(index, fx_index)` | List available presets |
 | `get_fx_preset(index, fx_index)` | Get current preset |
 | `set_fx_preset(index, fx_index, name)` | Load preset |

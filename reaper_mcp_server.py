@@ -467,6 +467,56 @@ async def track_fx_set_param(track_index: int, fx_index: int, param_index: int, 
     return await reaper_call("TrackFX_SetParam", track_index, fx_index, param_index, value)
 
 
+@mcp.tool()
+async def track_fx_get_all_params(track_index: int, fx_index: int) -> dict:
+    """
+    Get all parameters of an FX plugin with names, values, and formatted display strings.
+
+    Returns everything you need to understand and control any FX in one call.
+    Use this instead of calling get_param_name/get_param individually for each parameter.
+
+    Args:
+        track_index: Track index (0-based) or -1 for master track.
+        fx_index: FX index (0-based) in the FX chain.
+
+    Returns:
+        Object with:
+        - fx_name: Plugin name
+        - param_count: Total number of parameters
+        - params: List of {index, name, value, min, max, formatted} for each parameter
+    """
+    # Get FX name
+    name_result = await reaper_call("TrackFX_GetFXName", track_index, fx_index, "")
+    fx_name = name_result.get("ret", "Unknown")
+
+    # Get param count
+    count_result = await reaper_call("TrackFX_GetNumParams", track_index, fx_index)
+    num_params = count_result.get("ret", 0)
+
+    params = []
+    for i in range(num_params):
+        # Get name, value, and formatted string in parallel-ish
+        pname = await reaper_call("TrackFX_GetParamName", track_index, fx_index, i, "")
+        pval = await reaper_call("TrackFX_GetParam", track_index, fx_index, i)
+        pfmt = await reaper_call("TrackFX_GetFormattedParamValue", track_index, fx_index, i)
+
+        params.append({
+            "index": i,
+            "name": pname.get("ret", f"Param {i}"),
+            "value": pval.get("value", 0),
+            "min": pval.get("min", 0),
+            "max": pval.get("max", 1),
+            "formatted": pfmt.get("ret", ""),
+        })
+
+    return {
+        "ok": True,
+        "fx_name": fx_name,
+        "param_count": num_params,
+        "params": params,
+    }
+
+
 # --- ROUTING OPERATIONS ---
 
 @mcp.tool()
