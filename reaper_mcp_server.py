@@ -1872,6 +1872,43 @@ async def set_track_phase(track_index: int, invert: bool) -> dict:
 
 
 @mcp.tool()
+async def get_track_master_send(track_index: int) -> dict:
+    """
+    Get the master/parent send state of a track.
+
+    When master send is enabled, the track's audio is routed to its parent track
+    (or the master track if it has no parent folder). Disabling it is useful when
+    routing a track exclusively through sends.
+
+    Args:
+        track_index: Track index (0-based) or -1 for master.
+
+    Returns:
+        Object with 'ret' field (1 = enabled, 0 = disabled).
+    """
+    return await reaper_call("GetMediaTrackInfo_Value", track_index, "B_MAINSEND")
+
+
+@mcp.tool()
+async def set_track_master_send(track_index: int, enabled: bool) -> dict:
+    """
+    Enable or disable the master/parent send on a track.
+
+    When enabled, the track's audio is routed to its parent track (or the master
+    track if it has no parent folder). Disable it when you want a track to only
+    output through its sends (e.g., a track routed exclusively to a bus).
+
+    Args:
+        track_index: Track index (0-based) or -1 for master.
+        enabled: True to enable master/parent send, False to disable.
+
+    Returns:
+        Object with success status.
+    """
+    return await reaper_call("SetMediaTrackInfo_Value", track_index, "B_MAINSEND", 1 if enabled else 0)
+
+
+@mcp.tool()
 async def set_track_width(track_index: int, width: float) -> dict:
     """
     Set the stereo width of a track.
