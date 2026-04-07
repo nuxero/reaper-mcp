@@ -2037,6 +2037,20 @@ async def get_track_peak_hold(track_index: int, channel: int = 0) -> dict:
     return await reaper_call("Track_GetPeakHoldDB", track_index, channel)
 
 
+@mcp.tool()
+async def clear_all_peak_indicators() -> dict:
+    """
+    Clear all peak hold indicators on all tracks.
+
+    Resets the peak hold values that accumulate during playback. Useful before
+    a fresh playback pass when you want clean peak readings for gain staging.
+
+    Returns:
+        Object with success status.
+    """
+    return await reaper_call("Main_OnCommand", 40218, 0)
+
+
 # --- ADVANCED FEATURES ---
 
 @mcp.tool()
