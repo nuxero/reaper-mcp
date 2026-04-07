@@ -2,7 +2,7 @@
 
 A [TwelveTake Studios](https://twelvetake.com) project.
 
-[![Tools](https://img.shields.io/badge/tools-130-blue)](https://github.com/TwelveTake/reaper-mcp)
+[![Tools](https://img.shields.io/badge/tools-134-blue)](https://github.com/TwelveTake/reaper-mcp)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-yellow)](https://buymeacoffee.com/twelvetake)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-support-ff5e5b)](https://ko-fi.com/twelvetake)
 
@@ -32,14 +32,15 @@ Most MCP servers just wrap REAPER's API and call it a day. This one includes **p
 - **Stock REAPER Lua only** — the bridge script has no dependencies, nothing extra to install in REAPER
 - Copy the script, run it, connect your AI assistant
 
-### 130 Tools Covering Real Production Needs
+### 134 Tools Covering Real Production Needs
 
 - **Full FX control** — add/remove plugins, get/set any parameter by index, manage presets, bypass
-- **Complete routing** — sends, receives, sidechain routing to specific channel pairs
+- **Complete routing** — sends, receives, sidechain routing to specific channel pairs, master/parent send control
 - **Automation** — create envelopes, add/edit points, set automation modes
 - **MIDI** — create items, add notes individually or in batches, edit velocities
 - **Audio items** — import, split, duplicate, fade, position, mute
 - **Markers & regions** — create, edit, navigate, render by region
+- **Metering** — real-time peak levels and peak hold for gain staging
 
 ## Requirements
 
@@ -141,7 +142,9 @@ REAPER_COMM_MODE=http python reaper_mcp_server.py
 "Add ReaComp to the bass track"
 "Set up sidechain compression from the kick to the bass"
 "Create a drum bus and route tracks 0-3 to it"
+"Disable master send on track 2 so it only goes through the bus"
 "Add a mastering chain to the master track"
+"Check peak hold levels after playback for gain staging"
 ```
 
 ### FX and Parameters
@@ -178,7 +181,7 @@ REAPER_COMM_MODE=http python reaper_mcp_server.py
 
 ## Tool Reference
 
-### Track Operations (19 tools)
+### Track Operations (21 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -197,6 +200,8 @@ REAPER_COMM_MODE=http python reaper_mcp_server.py
 | `set_track_width(index, width)` | Set stereo width (0-2) |
 | `set_track_color(index, r, g, b)` | Set track color |
 | `get_track_peak(index, channel)` | Get current peak level |
+| `get_track_peak_hold(index, channel)` | Get peak hold level (highest since last reset) |
+| `clear_all_peak_indicators()` | Reset all peak hold indicators |
 | `set_track_as_folder(index, depth)` | Set as folder parent/child |
 | `arm_track(index, arm)` | Arm for recording |
 | `set_track_input(index, input)` | Set record input |
@@ -222,7 +227,7 @@ REAPER_COMM_MODE=http python reaper_mcp_server.py
 | `set_fx_preset(index, fx_index, name)` | Load preset |
 | `save_fx_preset(index, fx_index, name)` | Save current settings as preset |
 
-### Routing (9 tools)
+### Routing (11 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -235,6 +240,8 @@ REAPER_COMM_MODE=http python reaper_mcp_server.py
 | `setup_sidechain_send(src, dest, db)` | Create sidechain send |
 | `configure_reacomp_sidechain(index, fx_index, use)` | Configure ReaComp sidechain |
 | `setup_sidechain_compression(trigger, target, fx, db)` | Complete sidechain setup |
+| `get_track_master_send(index)` | Get master/parent send state |
+| `set_track_master_send(index, enabled)` | Enable/disable master/parent send |
 
 ### Transport (10 tools)
 
