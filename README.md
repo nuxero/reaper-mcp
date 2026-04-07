@@ -1,12 +1,30 @@
-# TwelveTake REAPER MCP
+# Reaper MCP (Nuxero Fork)
 
-> **Fork notice:** This is a fork of [TwelveTake Studios' reaper-mcp](https://github.com/TwelveTake-Studios/reaper-mcp), originally created by [TwelveTake Studios LLC](https://twelvetake.com) and licensed under the MIT License. This fork adds additional tools, Nix/direnv setup instructions, and other minor improvements. All original copyright and license terms apply.
+> **Fork notice:** This is a fork of [TwelveTake Studios' reaper-mcp](https://github.com/TwelveTake-Studios/reaper-mcp), originally created by [TwelveTake Studios LLC](https://twelvetake.com) and licensed under the MIT License. This fork fixes broken tools, adds new functionality, and includes Nix/direnv setup. All original copyright and license terms apply.
+>
+> If you'd like to support the original developers:
+> [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-TwelveTake-yellow)](https://buymeacoffee.com/twelvetake)
+> [![Ko-fi](https://img.shields.io/badge/Ko--fi-TwelveTake-ff5e5b)](https://ko-fi.com/twelvetake)
 
-A [TwelveTake Studios](https://twelvetake.com) project.
+[![Tools](https://img.shields.io/badge/tools-139-blue)](https://github.com/nuxero/reaper-mcp)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-support%20this%20fork-ff5e5b)](https://ko-fi.com/hectorzg)
 
-[![Tools](https://img.shields.io/badge/tools-139-blue)](https://github.com/TwelveTake/reaper-mcp)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-yellow)](https://buymeacoffee.com/twelvetake)
-[![Ko-fi](https://img.shields.io/badge/Ko--fi-support-ff5e5b)](https://ko-fi.com/twelvetake)
+## What's New in This Fork
+
+**Bug fixes:**
+- Fixed `set_item_position`, `set_item_length`, `set_item_mute`, `set_item_volume`, and other `set_item_*` tools
+- Fixed MIDI note tools (`add_midi_note`, `get_midi_notes`) and peak info retrieval
+
+**New tools & features:**
+- `get_track_master_send` / `set_track_master_send` — control master/parent send per track
+- `clear_all_peak_indicators` — reset peak hold indicators across all tracks
+- `get_eq_bands` / `set_eq_band` / `get_eq_band_enabled` / `set_eq_band_enabled` — dedicated ReaEQ band control with real values (Hz, dB, Q)
+- `get_track_fx_chunk` — get parsed FX state (name, preset, bypass, params, base64)
+- `get_project_summary` — comprehensive project state in one call
+
+**Environment & setup:**
+- Nix flake + direnv support for reproducible dev environments
 
 A comprehensive Model Context Protocol (MCP) server that enables AI assistants to control REAPER DAW for mixing, mastering, MIDI composition, and full music production workflows.
 
@@ -501,6 +519,4 @@ MIT License - see [LICENSE](LICENSE)
 
 ---
 
-**TwelveTake Studios LLC**
-Website: [twelvetake.com](https://twelvetake.com)
-Contact: contact@twelvetake.com
+Maintained by [Nuxero](https://github.com/nuxero) · Originally created by [TwelveTake Studios LLC](https://twelvetake.com)
