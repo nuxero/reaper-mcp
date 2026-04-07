@@ -1,5 +1,7 @@
 # TwelveTake REAPER MCP
 
+> **Fork notice:** This is a fork of [TwelveTake Studios' reaper-mcp](https://github.com/TwelveTake-Studios/reaper-mcp), originally created by [TwelveTake Studios LLC](https://twelvetake.com) and licensed under the MIT License. This fork adds additional tools, Nix/direnv setup instructions, and other minor improvements. All original copyright and license terms apply.
+
 A [TwelveTake Studios](https://twelvetake.com) project.
 
 [![Tools](https://img.shields.io/badge/tools-134-blue)](https://github.com/TwelveTake/reaper-mcp)
@@ -94,6 +96,55 @@ Add to your MCP configuration (e.g., `~/.claude.json` or `.mcp.json`):
 ```bash
 python test_connection.py
 ```
+
+### Alternative: NixOS / Nix + direnv Setup
+
+If you use Nix with direnv, this repo includes a `flake.nix` and `.envrc` that set up the Python environment automatically. Here's how to configure the MCP JSON so your AI assistant uses the flake's environment:
+
+1. **Allow direnv** in the project directory:
+
+```bash
+cd path/to/reaper-mcp
+direnv allow
+```
+
+This activates the flake dev shell, creates a `.venv`, and activates it.
+
+2. **Install dependencies inside the venv** (first time only):
+
+```bash
+pip install -r requirements.txt
+```
+
+3. **Configure MCP JSON** using `direnv exec` so the server runs inside the flake environment:
+
+```json
+{
+  "mcpServers": {
+    "reaper": {
+      "command": "direnv",
+      "args": [
+        "exec",
+        "/absolute/path/to/reaper-mcp",
+        "python",
+        "/absolute/path/to/reaper-mcp/reaper_mcp_server.py"
+      ]
+    }
+  }
+}
+```
+
+Replace `/absolute/path/to/reaper-mcp` with the actual path to your clone.
+
+`direnv exec` loads the flake's dev shell (Python, venv, all dependencies) before launching the server, so the MCP client doesn't need Nix or Python on its own PATH.
+
+4. **Verify** the same way:
+
+```bash
+direnv exec . python test_connection.py
+```
+
+> **Tip:** If you update `flake.nix` or `requirements.txt`, run `direnv reload` to rebuild the environment.
 
 ## Communication Modes
 
