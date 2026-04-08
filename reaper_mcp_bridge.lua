@@ -4554,6 +4554,25 @@ local function process_request()
                             response.ok = false
                         end
                     
+                    elseif fname == "ClearAllPeakIndicators" then
+                        -- Clear all peak hold indicators on all tracks (including master)
+                        local count = reaper.CountTracks(0)
+                        -- Clear master track peaks
+                        local master = reaper.GetMasterTrack(0)
+                        if master then
+                            reaper.Track_GetPeakHoldDB(master, 0, true)
+                            reaper.Track_GetPeakHoldDB(master, 1, true)
+                        end
+                        -- Clear all regular track peaks
+                        for i = 0, count - 1 do
+                            local track = reaper.GetTrack(0, i)
+                            if track then
+                                reaper.Track_GetPeakHoldDB(track, 0, true)
+                                reaper.Track_GetPeakHoldDB(track, 1, true)
+                            end
+                        end
+                        response.ok = true
+                    
                     elseif fname == "TrackFX_GetFormattedParamValue" then
                         -- Get human-readable formatted parameter value
                         if #args >= 3 then

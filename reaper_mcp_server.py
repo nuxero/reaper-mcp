@@ -2098,7 +2098,7 @@ async def clear_all_peak_indicators() -> dict:
     Returns:
         Object with success status.
     """
-    return await reaper_call("Main_OnCommand", 40218, 0)
+    return await reaper_call("ClearAllPeakIndicators")
 
 
 # --- ADVANCED FEATURES ---
