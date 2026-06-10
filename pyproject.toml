@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "twelvetake-reaper-mcp"
-version = "1.2.0"
+version = "1.2.1"
 description = "MCP server for controlling REAPER DAW - mixing, mastering, MIDI composition, and full music production"
 readme = "README.md"
 license = "MIT"
@@ -47,6 +47,12 @@ dependencies = [
     "httpx>=0.25.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.1",
+]
+
 [project.urls]
 Homepage = "https://twelvetake.com"
 Repository = "https://github.com/TwelveTake-Studios/reaper-mcp"
@@ -77,7 +83,23 @@ exclude = [
     ".github/",
     "docs/",
     "assets/",
+    "tests/",
     "__pycache__/",
     "*.md",
     "!README.md",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+# reaper_web_server.py runs INSIDE REAPER with injected RPR_* globals — it is not a
+# standard Python module, so exclude it from linting (and it is deprecated).
+extend-exclude = ["reaper_web_server.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+# REAPER bridge globals (RPR_*) are injected at runtime; allow bare except in glue code.
+ignore = ["E501", "E722", "F403", "F405"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

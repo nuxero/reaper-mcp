@@ -9,10 +9,10 @@ A TwelveTake Studios project - https://twelvetake.com
 
 Author: TwelveTake Studios LLC
 License: MIT
-Version: 1.2.0
+Version: 1.2.1
 """
 
-__version__ = "1.2.0"
+__version__ = "1.2.1"
 __name__ = "twelvetake-reaper-mcp"
 
 import os

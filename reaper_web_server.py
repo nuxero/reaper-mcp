@@ -1,6 +1,12 @@
 """
 REAPER Web Server - ReaScript HTTP API
 
+*** DEPRECATED (as of v1.2.1) ***
+The supported communication path is the file-based bridge: reaper_mcp_bridge.lua.
+This HTTP server is kept for existing users but is no longer maintained and will not
+receive new tools. It also requires Python to be enabled in REAPER's preferences. It may
+be removed in a future major release (v2.0). Prefer the file bridge. See README.md.
+
 This script runs inside REAPER and exposes an HTTP API for controlling REAPER.
 Zero external dependencies - uses only Python stdlib and REAPER's RPR_* functions.
 

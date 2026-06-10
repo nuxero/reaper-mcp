@@ -1,165 +1,111 @@
 #!/usr/bin/env python3
 """
-REAPER MCP Server - Connection Test
+REAPER MCP Server - Connection Test (file bridge)
 
-Tests the connection to the REAPER web server and verifies basic functionality.
+Verifies the file-based bridge round-trip: writes a request JSON into the bridge
+directory and waits for the REAPER-side bridge (reaper_mcp_bridge.lua) to write a
+response. This is the default, supported communication path and needs no extra setup
+beyond running the bridge script inside REAPER.
 
 Usage:
-    python test_connection.py [host] [port]
+    python test_connection.py
 
-Default: localhost:9000
+The bridge directory defaults to %APPDATA%\\REAPER\\Scripts\\mcp_bridge_data and can be
+overridden with the REAPER_BRIDGE_DIR environment variable (mirrors the MCP server).
+
+Pure standard library — no third-party dependencies required.
 """
 
+import os
 import sys
 import json
+import time
+from pathlib import Path
 
-try:
-    import httpx
-except ImportError:
-    print("Error: httpx not installed. Run: pip install httpx")
-    sys.exit(1)
+# Mirror the MCP server's bridge-directory resolution.
+BRIDGE_DIR = Path(
+    os.getenv("REAPER_BRIDGE_DIR")
+    or os.path.expandvars(r"%APPDATA%\REAPER\Scripts\mcp_bridge_data")
+)
+
+TIMEOUT = 5.0
+POLL_INTERVAL = 0.05
+_counter = 0
 
 
-def test_connection(host: str = "localhost", port: int = 9000):
-    """Test connection to REAPER web server"""
-    base_url = f"http://{host}:{port}"
-    client = httpx.Client(timeout=5.0)
+def reaper_call(func: str, args: list, timeout: float = TIMEOUT) -> dict:
+    """Send one request through the file bridge and return the decoded response."""
+    global _counter
+    _counter = (_counter % 999) + 1
+    BRIDGE_DIR.mkdir(parents=True, exist_ok=True)
 
-    print(f"Testing REAPER Web Server at {base_url}...")
-    print("=" * 50)
+    request_file = BRIDGE_DIR / f"request_{_counter}.json"
+    response_file = BRIDGE_DIR / f"response_{_counter}.json"
 
-    # Test 1: Ping
-    print("\n1. Testing /ping endpoint...")
     try:
-        response = client.get(f"{base_url}/ping")
-        data = response.json()
-        if data.get("status") == "ok":
-            print("   [PASS] Server is responding")
-        else:
-            print(f"   [FAIL] Unexpected response: {data}")
-            return False
-    except httpx.ConnectError:
-        print("   [FAIL] Cannot connect to server")
-        print(f"\n   Make sure:")
-        print(f"   1. REAPER is running")
-        print(f"   2. reaper_web_server.py is loaded and running in REAPER")
-        print(f"   3. Server is listening on {base_url}")
-        return False
-    except Exception as e:
-        print(f"   [FAIL] Error: {e}")
-        return False
+        response_file.unlink(missing_ok=True)
+    except OSError:
+        pass
 
-    # Test 2: Track count
-    print("\n2. Testing /tracks/count endpoint...")
-    try:
-        response = client.get(f"{base_url}/tracks/count")
-        data = response.json()
-        if "count" in data:
-            print(f"   [PASS] Project has {data['count']} tracks")
-        else:
-            print(f"   [FAIL] Unexpected response: {data}")
-    except Exception as e:
-        print(f"   [FAIL] Error: {e}")
+    request_file.write_text(json.dumps({"func": func, "args": args}))
 
-    # Test 3: Master track
-    print("\n3. Testing /master endpoint (master track info)...")
-    try:
-        response = client.get(f"{base_url}/master")
-        data = response.json()
-        if "name" in data:
-            print(f"   [PASS] Master track: {data.get('name', 'MASTER')}")
-            print(f"         Volume: {data.get('volume_db', 0):.1f} dB")
-        else:
-            print(f"   [FAIL] Unexpected response: {data}")
-    except Exception as e:
-        print(f"   [FAIL] Error: {e}")
+    start = time.time()
+    while time.time() - start < timeout:
+        if response_file.exists():
+            text = response_file.read_text().strip()
+            if text:
+                try:
+                    data = json.loads(text)
+                except json.JSONDecodeError:
+                    time.sleep(POLL_INTERVAL)
+                    continue
+                request_file.unlink(missing_ok=True)
+                response_file.unlink(missing_ok=True)
+                return data
+        time.sleep(POLL_INTERVAL)
 
-    # Test 4: Master track FX count
-    print("\n4. Testing /tracks/-1/fx/count endpoint (master track FX)...")
-    try:
-        response = client.get(f"{base_url}/tracks/-1/fx/count")
-        data = response.json()
-        if "count" in data:
-            print(f"   [PASS] Master track has {data['count']} FX plugins")
-        else:
-            print(f"   [FAIL] Unexpected response: {data}")
-    except Exception as e:
-        print(f"   [FAIL] Error: {e}")
+    request_file.unlink(missing_ok=True)
+    return {"ok": False, "error": "timeout"}
 
-    # Test 5: Transport state
-    print("\n5. Testing /transport endpoint...")
-    try:
-        response = client.get(f"{base_url}/transport")
-        data = response.json()
-        if "playing" in data:
-            status = "playing" if data["playing"] else "stopped"
-            print(f"   [PASS] Transport: {status}, cursor at {data.get('cursor_position', 0):.2f}s")
-        else:
-            print(f"   [FAIL] Unexpected response: {data}")
-    except Exception as e:
-        print(f"   [FAIL] Error: {e}")
 
-    # Test 6: Project info
-    print("\n6. Testing /project endpoint...")
-    try:
-        response = client.get(f"{base_url}/project")
-        data = response.json()
-        if "tempo" in data:
-            print(f"   [PASS] Project: {data.get('name', 'Untitled')}")
-            print(f"         Tempo: {data.get('tempo', 120)} BPM")
-        else:
-            print(f"   [FAIL] Unexpected response: {data}")
-    except Exception as e:
-        print(f"   [FAIL] Error: {e}")
+def main() -> int:
+    print(f"Testing REAPER file bridge at:\n  {BRIDGE_DIR}")
+    print("=" * 56)
 
-    # Test 7: Test first track if exists
-    print("\n7. Testing track access...")
-    try:
-        count_resp = client.get(f"{base_url}/tracks/count")
-        count = count_resp.json().get("count", 0)
+    # Test 1: connectivity via track count
+    print("\n1. Track count (CountTracks)...")
+    result = reaper_call("CountTracks", [0])
+    if not result.get("ok"):
+        print(f"   [FAIL] No response ({result.get('error')}).")
+        print("\n   Make sure:")
+        print("   1. REAPER is running")
+        print("   2. reaper_mcp_bridge.lua is loaded and running in REAPER")
+        print('      (you should see "REAPER MCP Bridge started" in the console)')
+        return 1
+    print(f"   [PASS] Project has {result.get('ret')} tracks")
 
-        if count > 0:
-            response = client.get(f"{base_url}/tracks/0")
-            data = response.json()
-            if "name" in data:
-                print(f"   [PASS] Track 0: {data.get('name', 'Unnamed')}")
-                print(f"         Volume: {data.get('volume_db', 0):.1f} dB, Pan: {data.get('pan', 0):.2f}")
+    # Test 2: master track info
+    print("\n2. Master track (GetTrackInfo -1)...")
+    result = reaper_call("GetTrackInfo", [-1])
+    info = result.get("info", {})
+    if result.get("ok") and "name" in info:
+        fx = ", ".join(info.get("fx_names", [])) or "none"
+        print(f"   [PASS] Master: {info.get('name')} | FX: {fx}")
+    else:
+        print(f"   [FAIL] Unexpected response: {result}")
 
-                # Test FX on first track
-                fx_resp = client.get(f"{base_url}/tracks/0/fx/count")
-                fx_data = fx_resp.json()
-                print(f"         FX count: {fx_data.get('count', 0)}")
-            else:
-                print(f"   [FAIL] Unexpected response: {data}")
-        else:
-            print("   [SKIP] No tracks in project")
-    except Exception as e:
-        print(f"   [FAIL] Error: {e}")
+    # Test 3: tempo
+    print("\n3. Project tempo (Master_GetTempo)...")
+    result = reaper_call("Master_GetTempo", [])
+    if result.get("ok"):
+        print(f"   [PASS] Tempo: {result.get('ret')} BPM")
+    else:
+        print(f"   [FAIL] Unexpected response: {result}")
 
-    print("\n" + "=" * 50)
-    print("Connection test complete!")
-    print("\nIf all tests passed, the MCP server should work correctly.")
-    print("Configure Claude Code with:")
-    print(f"""
-{{
-  "mcpServers": {{
-    "reaper": {{
-      "command": "python",
-      "args": ["{sys.path[0]}/reaper_mcp_server.py"],
-      "env": {{
-        "REAPER_HOST": "{host}",
-        "REAPER_PORT": "{port}"
-      }}
-    }}
-  }}
-}}
-""")
-    return True
+    print("\n" + "=" * 56)
+    print("Connection test complete - the file bridge is working.")
+    return 0
 
 
 if __name__ == "__main__":
-    host = sys.argv[1] if len(sys.argv) > 1 else "localhost"
-    port = int(sys.argv[2]) if len(sys.argv) > 2 else 9000
-
-    success = test_connection(host, port)
-    sys.exit(0 if success else 1)
+    sys.exit(main())

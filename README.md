@@ -97,11 +97,13 @@ python test_connection.py
 
 ## Communication Modes
 
-The MCP server supports two communication modes:
+The **file-based bridge is the supported path** — it is reliable and needs no extra setup.
+HTTP mode is **deprecated** (see below).
 
-### File-Based (Default)
+### File-Based (Default, Recommended)
 
 Uses JSON files for communication. More reliable, no network configuration needed.
+This is the only actively maintained path; all tools are guaranteed to work here.
 
 ```
 MCP Server                    REAPER Bridge
@@ -113,7 +115,11 @@ MCP Server                    REAPER Bridge
 
 **Bridge directory:** `%APPDATA%\REAPER\Scripts\mcp_bridge_data`
 
-### HTTP Mode (Advanced)
+### HTTP Mode (Deprecated)
+
+> **Deprecated as of v1.2.1.** The HTTP bridges (`reaper_web_server.lua` / `reaper_web_server.py`)
+> are kept for existing users but are no longer maintained and will not receive new tools.
+> They may be removed in a future major release (v2.0). Use the file bridge instead.
 
 Uses HTTP requests on localhost. Requires additional setup:
 - **Lua HTTP bridge**: Requires LuaSocket (install via ReaPack → "sockmonkey")

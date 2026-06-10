@@ -1,5 +1,11 @@
 -- REAPER Web Server - ReaScript HTTP API (Lua version)
 --
+-- *** DEPRECATED (as of v1.2.1) ***
+-- The supported communication path is the file-based bridge: reaper_mcp_bridge.lua.
+-- This HTTP server is kept for existing users but is no longer maintained and will not
+-- receive new tools. It may be removed in a future major release (v2.0). Prefer the file
+-- bridge, which requires no extra setup. See README.md.
+--
 -- This script runs inside REAPER and exposes an HTTP API for controlling REAPER.
 -- Works with REAPER's built-in Lua support - no additional configuration needed.
 --
