@@ -491,7 +491,14 @@ async def track_fx_set_param(track_index: int, fx_index: int, param_index: int, 
         track_index: Track index (0-based) or -1 for master track.
         fx_index: FX index (0-based) in the FX chain.
         param_index: Parameter index (0-based).
-        value: New value for the parameter (typically normalized 0-1, check min/max).
+        value: New value for the parameter (normalized 0-1 for most plugins).
+
+    Note:
+        For ReaEQ, use set_eq_band() instead. TrackFX_SetParam writes raw
+        normalized values which may not stick on ReaEQ because it uses REAPER's
+        dedicated EQ API internally — direct parameter writes can be overridden
+        by the cached EQ state. The set_eq_band() function uses
+        TrackFX_SetEQParam which properly updates the internal EQ state.
     """
     return await reaper_call("TrackFX_SetParam", track_index, fx_index, param_index, value)
 
@@ -2264,15 +2271,20 @@ async def get_eq_bands(track_index: int, fx_index: int) -> dict:
         if result.get("ok"):
             bt = result.get("bandtype", -99)
             pt = result.get("paramtype", -1)
-            bands.append({
+            normval = result.get("normval", 0)
+            band_data = {
                 "band_index": i,
                 "bandtype": bt,
                 "bandtype_name": bandtype_names.get(bt, "unknown"),
                 "bandidx": result.get("bandidx", 0),
                 "paramtype": pt,
                 "paramtype_name": paramtype_names.get(pt, "unknown"),
-                "normval": result.get("normval", 0),
-            })
+                "normval": normval,
+            }
+            # Add computed real value for gain
+            if pt == 1 and normval is not None:
+                band_data["gain_db"] = round(_eq_norm_to_db(normval), 2)
+            bands.append(band_data)
 
     # Also get formatted values for readability
     for band in bands:
@@ -2281,6 +2293,64 @@ async def get_eq_bands(track_index: int, fx_index: int) -> dict:
             band["formatted"] = fmt.get("ret", "")
 
     return {"ok": True, "bands": bands, "param_count": num_params}
+
+
+def _db_to_eq_norm(db: float) -> float:
+    """Convert dB gain to ReaEQ normalized value (0-1).
+
+    ReaEQ uses the curve: dB = 6 * log2(norm / 0.5)
+    Inverse: norm = 0.5 * 2^(dB / 6)
+
+    Mapping:
+        0.0   → -inf dB
+        0.25  → -6 dB
+        0.5   → 0 dB
+        1.0   → +6 dB
+    """
+    import math
+    if db <= -150:
+        return 0.0
+    norm = 0.5 * (2.0 ** (db / 6.0))
+    return max(0.0, min(1.0, norm))
+
+
+def _eq_norm_to_db(norm: float) -> float:
+    """Convert ReaEQ normalized value (0-1) to dB gain.
+
+    ReaEQ uses the curve: dB = 6 * log2(norm / 0.5)
+    """
+    import math
+    if norm <= 0.0:
+        return -150.0  # Effectively -inf
+    return 6.0 * math.log2(norm / 0.5)
+
+
+def _hz_to_eq_norm(hz: float) -> float:
+    """Convert frequency in Hz to ReaEQ normalized value (0-1).
+
+    ReaEQ uses a logarithmic frequency scale from ~20 Hz to ~24000 Hz:
+        norm = log(freq/20) / log(24000/20)
+    """
+    import math
+    if hz <= 20.0:
+        return 0.0
+    if hz >= 24000.0:
+        return 1.0
+    return math.log(hz / 20.0) / math.log(24000.0 / 20.0)
+
+
+def _q_to_eq_norm(q: float) -> float:
+    """Convert Q factor to ReaEQ normalized value (0-1).
+
+    ReaEQ uses a logarithmic Q scale from ~0.01 to ~100:
+        norm = log(Q/0.01) / log(100/0.01)
+    """
+    import math
+    if q <= 0.01:
+        return 0.0
+    if q >= 100.0:
+        return 1.0
+    return math.log(q / 0.01) / math.log(100.0 / 0.01)
 
 
 @mcp.tool()
@@ -2296,8 +2366,9 @@ async def set_eq_band(
     """
     Set a ReaEQ band parameter using REAPER's dedicated EQ API.
 
-    This uses real values (Hz, dB, Q) by default, not normalized 0-1 values.
-    Much easier than figuring out raw parameter indices.
+    By default (is_normalized=False), pass real values: Hz for frequency,
+    dB for gain, Q factor for bandwidth. The function handles the non-linear
+    dB-to-normalized conversion that ReaEQ uses internally.
 
     Args:
         track_index: Track index (0-based) or -1 for master.
@@ -2308,16 +2379,51 @@ async def set_eq_band(
                  Ignored for master gain.
         paramtype: Parameter to set (0=frequency in Hz, 1=gain in dB, 2=Q/bandwidth).
                    Ignored for master gain.
-        value: The value to set (Hz for freq, dB for gain, Q factor for Q).
-        is_normalized: If True, value is treated as normalized 0-1 instead of real units.
+        value: The value to set. When is_normalized=False (default):
+               - paramtype 0 (freq): value in Hz (e.g., 1000.0 for 1kHz)
+               - paramtype 1 (gain): value in dB (e.g., 3.0 for +3dB, -6.0 for -6dB).
+                 Range is approximately -inf to +6 dB.
+               - paramtype 2 (Q): Q factor (e.g., 1.0 for moderate, 4.0 for narrow).
+                 Range is approximately 0.01 to 100.
+               When is_normalized=True: value is 0.0-1.0 normalized (written directly).
+        is_normalized: If False (default), value is in real units (Hz/dB/Q) and
+                       this function converts to the correct normalized value.
+                       If True, value is written directly as a normalized 0-1 value.
 
     Returns:
-        Object with success status.
+        Object with success status (ok=true if the parameter was set successfully,
+        ok=false if track/fxidx is not ReaEQ or arguments are invalid).
+
+    Note:
+        This is the recommended way to set ReaEQ parameters. Do NOT use
+        track_fx_set_param for ReaEQ — it uses raw normalized values and
+        ReaEQ's internal EQ state may override direct parameter writes.
     """
-    return await reaper_call(
-        "TrackFX_SetEQParam", track_index, fx_index,
-        bandtype, bandidx, paramtype, value, is_normalized
-    )
+    if is_normalized:
+        # User is passing a normalized value directly — pass through with isnorm=true
+        return await reaper_call(
+            "TrackFX_SetEQParam", track_index, fx_index,
+            bandtype, bandidx, paramtype, value, True
+        )
+
+    if paramtype == 1:
+        # Gain: dB → normalized using ReaEQ's non-linear curve.
+        # REAPER's TrackFX_SetEQParam with isnorm=false does NOT correctly
+        # convert dB to normalized for gain — it just divides by the max range.
+        # We handle the conversion ourselves and pass isnorm=true.
+        norm_value = _db_to_eq_norm(value)
+        return await reaper_call(
+            "TrackFX_SetEQParam", track_index, fx_index,
+            bandtype, bandidx, paramtype, norm_value, True
+        )
+    else:
+        # Frequency (paramtype=0) and Q (paramtype=2) work correctly with
+        # isnorm=false — REAPER handles the Hz/Q to normalized conversion
+        # properly for these parameter types.
+        return await reaper_call(
+            "TrackFX_SetEQParam", track_index, fx_index,
+            bandtype, bandidx, paramtype, value, False
+        )
 
 
 @mcp.tool()
